@@ -183,7 +183,7 @@ function App() {
           <div className="flex items-center gap-2 text-xs font-mono">
             <span className={`w-2 h-2 rounded-full ${systemHealth?.ollama_available ? 'bg-[#00FF66]' : 'bg-[#FFB300]'}`}></span>
             <span className="text-[#8F939D]">
-              AI: {systemHealth?.ollama_available ? 'OLLAMA ONLINE' : 'MOCK MODE'}
+              AI: {systemHealth?.gemini_available ? 'GEMINI ONLINE' : 'MOCK MODE'}
             </span>
           </div>
           <div className="text-xs font-mono text-[#8F939D]">

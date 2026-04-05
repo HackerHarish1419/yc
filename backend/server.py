@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
+from google import genai
 
 
 ROOT_DIR = Path(__file__).parent
@@ -23,9 +24,18 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Ollama configuration
-OLLAMA_URL = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
-OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3.1:8b')
+# Gemini configuration
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')
+
+# Initialize Gemini client
+gemini_client = None
+if GEMINI_API_KEY:
+    try:
+        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+        logging.info("Gemini client initialized successfully")
+    except Exception as e:
+        logging.error(f"Failed to initialize Gemini client: {e}")
 
 # Create the main app
 app = FastAPI(title="AURA-V Backend", version="1.0.0")
@@ -221,50 +231,73 @@ current_swarm_state = {
 
 
 # ===== Helper Functions =====
-async def check_ollama_health():
-    """Check if Ollama server is available"""
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{OLLAMA_URL}/")
-            return response.status_code == 200
-    except Exception:
-        return False
+def check_gemini_available():
+    """Check if Gemini client is available"""
+    return gemini_client is not None and GEMINI_API_KEY != ''
 
 
-async def generate_tactical_recommendation_ollama(request: TacticalRequest) -> str:
-    """Generate tactical recommendation using Ollama"""
-    prompt = f"""You are AURA-V, a tactical AI copilot for drone swarm operations. 
-A critical anomaly has been detected:
+async def generate_tactical_recommendation_gemini(request: TacticalRequest) -> Optional[Dict]:
+    """Generate tactical recommendation using Gemini AI"""
+    if not gemini_client:
+        return None
+    
+    prompt = f"""You are AURA-V, a tactical AI copilot for drone swarm operations.
 
-ANOMALY TYPE: {request.anomaly_type}
-AFFECTED ASSET: {request.affected_drone_id}
-CURRENT SWARM STATUS: {len(request.swarm_state.get('drones', []))} assets active
+ALERT: {request.anomaly_type.replace('_', ' ')} detected on {request.affected_drone_id}
+SWARM SIZE: {len(request.swarm_state.get('drones', []))} assets
 
-Generate a tactical response following ROE (Rules of Engagement) constraints.
-Provide:
-1. PRIMARY ACTION (one sentence)
-2. RECOVERY STEPS (numbered list, 3-4 steps)
-3. SWARM REASSIGNMENT (which drones should cover the gap)
-4. ROE COMPLIANCE STATUS
-
-Keep response concise and military-style."""
+Generate a tactical JSON response:
+- primary_action: one immediate command sentence for the affected drone
+- recovery_steps: array of 4 numbered recovery steps
+- reassignment_vectors: array of drone reassignments with drone_id, action, note
+- roe_compliance: GREEN/AMBER/RED with brief explanation
+- confidence: HIGH/MEDIUM/LOW"""
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{OLLAMA_URL}/api/generate",
-                json={
-                    "model": OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.7
-                }
+        response = gemini_client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config=genai.types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema={
+                    "type": "object",
+                    "properties": {
+                        "primary_action": {"type": "string"},
+                        "recovery_steps": {"type": "array", "items": {"type": "string"}},
+                        "reassignment_vectors": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "drone_id": {"type": "string"},
+                                    "action": {"type": "string"},
+                                    "note": {"type": "string"}
+                                }
+                            }
+                        },
+                        "roe_compliance": {"type": "string"},
+                        "confidence": {"type": "string"}
+                    },
+                    "required": ["primary_action", "recovery_steps", "roe_compliance", "confidence"]
+                },
+                temperature=0.5,
+                max_output_tokens=800,
             )
-            if response.status_code == 200:
-                result = response.json()
-                return result.get("response", "")
+        )
+        
+        if response and response.text:
+            text = response.text.strip()
+            logging.info(f"Gemini raw response: {text[:200]}")
+            
+            try:
+                parsed = json.loads(text)
+                logging.info(f"Successfully parsed Gemini structured response for {request.anomaly_type}")
+                return parsed
+            except json.JSONDecodeError as e:
+                logging.warning(f"JSON parse error even with schema: {e}")
+                
     except Exception as e:
-        logging.error(f"Ollama request failed: {e}")
+        logging.error(f"Gemini request failed: {e}")
     
     return None
 
@@ -357,11 +390,11 @@ async def root():
 @api_router.get("/health")
 async def health_check():
     """System health check"""
-    ollama_available = await check_ollama_health()
+    gemini_available = check_gemini_available()
     return {
         "status": "operational",
-        "ollama_available": ollama_available,
-        "ollama_model": OLLAMA_MODEL if ollama_available else "MOCK_MODE",
+        "gemini_available": gemini_available,
+        "ai_model": GEMINI_MODEL if gemini_available else "MOCK_MODE",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -489,17 +522,25 @@ async def simulate_attack(request: AttackSimulationRequest):
 async def get_tactical_recommendation(request: TacticalRequest):
     """Get AI tactical recommendation for anomaly"""
     
-    # Try Ollama first
-    ollama_response = await generate_tactical_recommendation_ollama(request)
+    # Try Gemini AI first
+    gemini_response = await generate_tactical_recommendation_gemini(request)
     
-    if ollama_response:
-        # Parse Ollama response into structured format
-        # For demo, we'll use mock structure but could parse the text
-        recommendation = generate_mock_recommendation(request)
-        recommendation.primary_action = ollama_response[:500] if len(ollama_response) > 500 else ollama_response
+    if gemini_response:
+        # Use Gemini's structured response
+        recommendation = TacticalRecommendation(
+            recommendation_id=str(uuid.uuid4())[:8].upper(),
+            primary_action=gemini_response.get("primary_action", "Initiating tactical response..."),
+            recovery_steps=gemini_response.get("recovery_steps", []),
+            reassignment_vectors=gemini_response.get("reassignment_vectors", []),
+            roe_compliance=gemini_response.get("roe_compliance", "AMBER - Awaiting assessment"),
+            confidence=gemini_response.get("confidence", "MEDIUM"),
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
+        logging.info(f"Generated Gemini recommendation for {request.anomaly_type}")
     else:
         # Fall back to mock
         recommendation = generate_mock_recommendation(request)
+        logging.info(f"Using mock recommendation for {request.anomaly_type}")
     
     # Log recommendation
     event = MissionEvent(

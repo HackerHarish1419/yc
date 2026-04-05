@@ -92,18 +92,18 @@ function SwarmStatus({ swarmState, systemHealth }) {
           {/* AI Status */}
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 border flex items-center justify-center ${
-              systemHealth?.ollama_available ? 'border-[#007AFF] bg-[#007AFF]/10' : 'border-[#2A2D35]'
+              systemHealth?.gemini_available ? 'border-[#007AFF] bg-[#007AFF]/10' : 'border-[#2A2D35]'
             }`}>
               <Cpu className={`w-5 h-5 ${
-                systemHealth?.ollama_available ? 'text-[#007AFF]' : 'text-[#FFB300]'
+                systemHealth?.gemini_available ? 'text-[#007AFF]' : 'text-[#FFB300]'
               }`} />
             </div>
             <div>
               <div className="text-xs font-mono font-bold text-white">COPILOT</div>
               <div className={`text-[10px] font-mono uppercase tracking-wider ${
-                systemHealth?.ollama_available ? 'text-[#007AFF]' : 'text-[#FFB300]'
+                systemHealth?.gemini_available ? 'text-[#007AFF]' : 'text-[#FFB300]'
               }`}>
-                {systemHealth?.ollama_available ? 'ONLINE' : 'MOCK'}
+                {systemHealth?.gemini_available ? 'GEMINI' : 'MOCK'}
               </div>
             </div>
           </div>
