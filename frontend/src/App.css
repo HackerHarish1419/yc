@@ -1,34 +1,51 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* AURA-V Tactical Dashboard Styles */
+
+/* Override default App styles for tactical theme */
+.App {
+  min-height: 100vh;
+  background-color: #050505;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Leaflet popup override */
+.leaflet-popup-content-wrapper {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+.leaflet-popup-content {
+  margin: 0 !important;
 }
 
-.App-link {
-    color: #61dafb;
+.leaflet-popup-tip-container {
+  display: none !important;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+.leaflet-popup-close-button {
+  color: #8F939D !important;
+  font-size: 16px !important;
+  top: 4px !important;
+  right: 4px !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: #FFFFFF !important;
+}
+
+/* Drone marker styles */
+.drone-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Map attribution */
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  background: rgba(10, 10, 10, 0.8) !important;
+  color: #5C5F66 !important;
+}
+
+.leaflet-control-attribution a {
+  color: #8F939D !important;
 }
