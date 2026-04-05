@@ -1,0 +1,107 @@
+{
+  "project_name": "AURA-V Glass Cockpit",
+  "theme": "Dark",
+  "archetype": "2 (The Performance Pro / Tactical Minimalism)",
+  "design_philosophy": "E1: Emotion First, Functional Brutalism. This is a mission-critical War Room. No soft shadows, no glassmorphism. Hard edges, high contrast, dense data presentation, and immediate anomaly visibility. Color is used strictly for status and action.",
+  "colors": {
+    "background": {
+      "main": "#050505",
+      "panel": "#0A0A0A",
+      "overlay": "rgba(5, 5, 5, 0.85)"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#8F939D",
+      "muted": "#5C5F66",
+      "mono": "#E2E4E9"
+    },
+    "border": {
+      "default": "#2A2D35",
+      "focus": "#434856",
+      "active": "#007AFF"
+    },
+    "status": {
+      "nominal": "#00FF66",
+      "warning": "#FFB300",
+      "critical": "#FF3B30",
+      "copilot_active": "#007AFF"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Chivo, sans-serif",
+      "body": "Inter, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "scale": {
+      "h1": "text-3xl font-black tracking-tighter uppercase",
+      "h2": "text-2xl font-bold tracking-tight uppercase",
+      "h3": "text-xl font-bold tracking-tight",
+      "h4": "text-base font-semibold uppercase tracking-[0.1em]",
+      "body": "text-sm",
+      "data": "text-sm font-mono tracking-tight",
+      "micro": "text-xs font-mono uppercase tracking-[0.2em]"
+    }
+  },
+  "spacing_and_layout": {
+    "grid_system": "The Control Room Grid",
+    "structure": "grid-cols-1 md:grid-cols-12 gap-4 h-screen p-4 box-border bg-[#050505]",
+    "panels": {
+      "map": "md:col-span-8 md:row-span-2 relative border border-border-default bg-black overflow-hidden h-[50vh] md:h-auto",
+      "sidebar": "md:col-span-4 md:row-span-2 flex flex-col gap-4 overflow-y-auto"
+    }
+  },
+  "surface_strategies": {
+    "panels": "GRID BORDERS - Flat background, 1px solid border, no rounded corners (rounded-none). The grid must be visible. Technical and rigid.",
+    "alerts": "THE TRACING BEAM - Critical alerts must have a glowing red (critical) or blue (copilot) 1px border. No soft shadows, use drop-shadow for neon effect.",
+    "buttons": "Neumorphism is BANNED. Use flat blocks of color with 1px borders. Hover state inverts colors or intensifies border."
+  },
+  "components": {
+    "map": {
+      "library": "react-leaflet",
+      "theme": "Use CartoDB Dark Matter tileset: https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      "markers": "Use custom SVG icons for drones. Drone-1 turns red during EW attack. Draw a red dashed polygon for ROE (Rules of Engagement) boundaries."
+    },
+    "telemetry_card": {
+      "layout": "Dense flex rows. Monospace fonts for all numeric data (Altitude, Battery, Signal).",
+      "battery": "Progress bar, 1px height. Turns red if < 20%.",
+      "signal": "Bar chart icon or textual 'RSSI: -45dBm'."
+    },
+    "ai_decision_card": {
+      "appearance": "High contrast. Border color: #007AFF. Uses typewriter effect for text to simulate real-time AI generation.",
+      "content": "Actionable ROE-compliant route. Contains an 'APPROVE' button.",
+      "button": "bg-[#007AFF] text-white font-bold uppercase tracking-widest py-3 px-6 w-full hover:bg-white hover:text-[#0A0A0C] transition-colors"
+    },
+    "ew_attack_button": {
+      "appearance": "bg-transparent border-2 border-[#FF3B30] text-[#FF3B30] font-black uppercase tracking-widest p-4 w-full hover:bg-[#FF3B30] hover:text-white transition-all",
+      "behavior": "When clicked, triggers the GPS loss anomaly on Drone-1, updates state to critical, and activates the AI Copilot."
+    }
+  },
+  "motion": {
+    "general": "Minimalist. Snap transitions. No bouncy springs.",
+    "alerts": "Flash background of Drone-1 panel red/black 3 times on EW attack.",
+    "copilot": "Fade in decision card, typewriter effect for text."
+  },
+  "icons": {
+    "library": "lucide-react",
+    "usage": "Use sharp, unrounded icons (Crosshair, ShieldAlert, Cpu, Radio, Navigation, Activity, Zap)."
+  },
+  "media": {
+    "image_urls": [],
+    "notes": "No standard images. Rely on Map tiles and SVG data viz."
+  },
+  "testing": {
+    "attributes": "ALL interactive and state-displaying elements MUST have `data-testid` attributes. Example: `data-testid='ew-attack-trigger'`, `data-testid='drone-1-status'`, `data-testid='approve-copilot-route'`."
+  },
+  "instructions_to_main_agent": [
+    "Use standard React with Tailwind CSS and Shadcn. The files are .js/.jsx, NOT .tsx.",
+    "Override all Shadcn border-radii to `rounded-none` to fit the tactical UI theme.",
+    "Install `lucide-react` for icons and `react-leaflet`, `leaflet` for the map.",
+    "Mock the map tiles using a standard dark tile provider: `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png`.",
+    "Implement the 5-drone telemetry data as a mocked React state. Drone-1 is the primary target for the EW attack.",
+    "Create a 'Simulate EW Attack' button. On click, update Drone-1's GPS status to 'LOST' and signal to 'JAMMED'.",
+    "For the Ollama 7B AI recommendations, try to make a real fetch call to localhost:11434 if possible, but definitely implement a robust fallback/mock that simulates the AI response with a 2-3 second delay and typing effect if the local LLM is unreachable.",
+    "Ensure the layout strictly follows 'The Control Room' grid: dense, minimal scrolling, highly functional.",
+    "Add `data-testid` attributes to all actionable elements to comply with testing requirements."
+  ]
+}
