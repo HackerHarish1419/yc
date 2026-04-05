@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import "@/App.css";
 import axios from "axios";
 import { Toaster, toast } from "sonner";
@@ -10,9 +10,18 @@ import SwarmStatus from "./components/SwarmStatus";
 import AICopilotCard from "./components/AICopilotCard";
 import MissionTimeline from "./components/MissionTimeline";
 import AlertPanel from "./components/AlertPanel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+// Attack types available for simulation
+const ATTACK_TYPES = [
+  { id: "GPS_JAMMING", label: "GPS Jamming", description: "Electronic warfare disrupting GPS signal" },
+  { id: "SIGNAL_LOSS", label: "Signal Loss", description: "Communication link degradation" },
+  { id: "SPOOFING", label: "GPS Spoofing", description: "False GPS coordinates injection" },
+  { id: "CYBER_INTRUSION", label: "Cyber Intrusion", description: "Attempted system breach detected" },
+];
 
 function App() {
   const [swarmState, setSwarmState] = useState(null);
@@ -22,6 +31,9 @@ function App() {
   const [isLoadingRecommendation, setIsLoadingRecommendation] = useState(false);
   const [missionEvents, setMissionEvents] = useState([]);
   const [systemHealth, setSystemHealth] = useState(null);
+  const [selectedAttackType, setSelectedAttackType] = useState("GPS_JAMMING");
+  const [selectedTargetDrone, setSelectedTargetDrone] = useState("D-1");
+  const lastAttackId = useRef(null); // Track last attack to prevent duplicates
 
   // Fetch swarm state
   const fetchSwarmState = useCallback(async () => {
@@ -54,14 +66,24 @@ function App() {
     }
   }, []);
 
-  // Simulate EW Attack
-  const simulateEWAttack = async () => {
+  // Simulate Attack with user-selected type
+  const simulateAttack = async () => {
     try {
+      // Prevent duplicate attacks
+      const attackId = `${selectedAttackType}-${selectedTargetDrone}-${Date.now()}`;
+      if (lastAttackId.current === attackId) return;
+      lastAttackId.current = attackId;
+
       setIsLoadingRecommendation(true);
       
-      // Trigger the attack
-      const attackResponse = await axios.post(`${API}/swarm/simulate-ew-attack`);
-      toast.error("EW ATTACK DETECTED - GPS JAMMING ON D-1", {
+      // Trigger the attack with selected parameters
+      const attackResponse = await axios.post(`${API}/swarm/simulate-attack`, {
+        attack_type: selectedAttackType,
+        target_drone: selectedTargetDrone
+      });
+      
+      const attackLabel = ATTACK_TYPES.find(a => a.id === selectedAttackType)?.label || selectedAttackType;
+      toast.error(`THREAT DETECTED - ${attackLabel.toUpperCase()} ON ${selectedTargetDrone}`, {
         duration: 5000,
       });
       
@@ -71,8 +93,8 @@ function App() {
       
       // Get tactical recommendation
       const recResponse = await axios.post(`${API}/copilot/recommend`, {
-        anomaly_type: "GPS_JAMMING",
-        affected_drone_id: "D-1",
+        anomaly_type: selectedAttackType,
+        affected_drone_id: selectedTargetDrone,
         swarm_state: swarmState,
         roe_constraints: {
           restricted_zones: [[34.06, -118.25], [34.04, -118.23]],
@@ -84,9 +106,9 @@ function App() {
       setIsLoadingRecommendation(false);
       
     } catch (e) {
-      console.error("Failed to simulate EW attack:", e);
+      console.error("Failed to simulate attack:", e);
       setIsLoadingRecommendation(false);
-      toast.error("Failed to process EW attack simulation");
+      toast.error("Failed to process attack simulation");
     }
   };
 
@@ -96,6 +118,7 @@ function App() {
       await axios.post(`${API}/swarm/reset`);
       setRecommendation(null);
       setEwAttackActive(false);
+      lastAttackId.current = null; // Clear attack tracking
       await fetchSwarmState();
       await fetchMissionEvents();
       toast.success("Swarm reset to nominal status");
@@ -198,20 +221,72 @@ function App() {
             systemHealth={systemHealth}
           />
 
-          {/* Attack Simulation Button */}
+          {/* Attack Simulation Panel */}
           <div className="border border-[#2A2D35] bg-[#0A0A0A] p-4">
+            <div className="text-xs font-mono text-[#8F939D] tracking-[0.2em] uppercase mb-3">
+              THREAT SIMULATION
+            </div>
+            
+            {/* Attack Type Selector */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div>
+                <label className="text-[10px] font-mono text-[#5C5F66] uppercase mb-1 block">Attack Type</label>
+                <Select value={selectedAttackType} onValueChange={setSelectedAttackType}>
+                  <SelectTrigger className="bg-[#050505] border-[#2A2D35] text-white text-xs font-mono rounded-none h-9" data-testid="attack-type-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A0A0A] border-[#2A2D35] rounded-none">
+                    {ATTACK_TYPES.map(attack => (
+                      <SelectItem 
+                        key={attack.id} 
+                        value={attack.id}
+                        className="text-xs font-mono text-white hover:bg-[#2A2D35] rounded-none"
+                      >
+                        {attack.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-[10px] font-mono text-[#5C5F66] uppercase mb-1 block">Target Drone</label>
+                <Select value={selectedTargetDrone} onValueChange={setSelectedTargetDrone}>
+                  <SelectTrigger className="bg-[#050505] border-[#2A2D35] text-white text-xs font-mono rounded-none h-9" data-testid="target-drone-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A0A0A] border-[#2A2D35] rounded-none">
+                    {(swarmState?.drones || []).map(drone => (
+                      <SelectItem 
+                        key={drone.id} 
+                        value={drone.id}
+                        className="text-xs font-mono text-white hover:bg-[#2A2D35] rounded-none"
+                      >
+                        {drone.id} ({drone.callsign})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {/* Attack description */}
+            <p className="text-[10px] font-mono text-[#5C5F66] mb-3">
+              {ATTACK_TYPES.find(a => a.id === selectedAttackType)?.description}
+            </p>
+            
             <div className="flex gap-2">
               <button
-                onClick={simulateEWAttack}
+                onClick={simulateAttack}
                 disabled={ewAttackActive || isLoadingRecommendation}
                 className={`flex-1 border-2 border-[#FF3B30] text-[#FF3B30] font-black uppercase tracking-widest p-3 
                   transition-all duration-200
                   ${ewAttackActive || isLoadingRecommendation 
                     ? 'opacity-50 cursor-not-allowed' 
                     : 'hover:bg-[#FF3B30] hover:text-white'}`}
-                data-testid="ew-attack-trigger"
+                data-testid="attack-trigger"
               >
-                {isLoadingRecommendation ? 'PROCESSING...' : 'SIMULATE EW ATTACK'}
+                {isLoadingRecommendation ? 'PROCESSING...' : 'EXECUTE SIMULATION'}
               </button>
               <button
                 onClick={resetSwarm}

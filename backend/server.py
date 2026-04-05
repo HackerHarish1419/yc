@@ -94,6 +94,44 @@ class MissionEvent(BaseModel):
     data: Optional[Dict[str, Any]] = None
 
 
+class AttackSimulationRequest(BaseModel):
+    attack_type: str  # GPS_JAMMING, SIGNAL_LOSS, SPOOFING, CYBER_INTRUSION
+    target_drone: str  # D-1, D-2, etc.
+
+
+# Attack type configurations
+ATTACK_CONFIGS = {
+    "GPS_JAMMING": {
+        "gps_status": "LOST",
+        "signal_strength": -95,
+        "status": "CRITICAL",
+        "event_type": "EW_ATTACK_DETECTED",
+        "description_template": "Electronic Warfare attack detected. GPS jamming affecting {drone_id} ({callsign})."
+    },
+    "SIGNAL_LOSS": {
+        "gps_status": "NOMINAL",
+        "signal_strength": -110,
+        "status": "CRITICAL",
+        "event_type": "SIGNAL_LOSS_DETECTED",
+        "description_template": "Signal loss detected on {drone_id} ({callsign}). Communication degraded."
+    },
+    "SPOOFING": {
+        "gps_status": "DEGRADED",
+        "signal_strength": -50,
+        "status": "WARNING",
+        "event_type": "SPOOFING_DETECTED",
+        "description_template": "GPS spoofing attempt detected on {drone_id} ({callsign}). Position data untrusted."
+    },
+    "CYBER_INTRUSION": {
+        "gps_status": "NOMINAL",
+        "signal_strength": -45,
+        "status": "CRITICAL",
+        "event_type": "CYBER_INTRUSION_DETECTED",
+        "description_template": "Cyber intrusion detected on {drone_id} ({callsign}). Network isolation recommended."
+    }
+}
+
+
 # ===== Initial Swarm Data =====
 INITIAL_SWARM = [
     {
@@ -233,12 +271,14 @@ Keep response concise and military-style."""
 
 def generate_mock_recommendation(request: TacticalRequest) -> TacticalRecommendation:
     """Generate mock tactical recommendation when Ollama unavailable"""
+    drone_id = request.affected_drone_id
+    
     recommendations = {
         "GPS_JAMMING": {
-            "primary_action": f"IMMEDIATE: Switch {request.affected_drone_id} to Visual-Inertial Odometry (VIO) mode. Initiate terrain-relative navigation.",
+            "primary_action": f"IMMEDIATE: Switch {drone_id} to Visual-Inertial Odometry (VIO) mode. Initiate terrain-relative navigation.",
             "recovery_steps": [
-                f"1. Activate VIO subsystem on {request.affected_drone_id}",
-                "2. Establish mesh network link with D-2 and D-4 for positional triangulation",
+                f"1. Activate VIO subsystem on {drone_id}",
+                "2. Establish mesh network link with nearby assets for positional triangulation",
                 "3. Reduce altitude to 800m for terrain feature recognition",
                 "4. Execute gradual RTB on last known safe vector (heading 225°)"
             ],
@@ -250,9 +290,9 @@ def generate_mock_recommendation(request: TacticalRequest) -> TacticalRecommenda
             "confidence": "HIGH"
         },
         "SIGNAL_LOSS": {
-            "primary_action": f"IMMEDIATE: Initiate peer-to-peer relay chain. {request.affected_drone_id} to broadcast on emergency mesh frequency.",
+            "primary_action": f"IMMEDIATE: Initiate peer-to-peer relay chain. {drone_id} to broadcast on emergency mesh frequency.",
             "recovery_steps": [
-                f"1. {request.affected_drone_id} switch to P2P mesh protocol",
+                f"1. {drone_id} switch to P2P mesh protocol",
                 "2. D-4 (RELAY) move to intermediate position for signal bridge",
                 "3. Reduce data transmission rate to essential telemetry only",
                 "4. Confirm link restoration within 30 seconds or initiate autonomous RTB"
@@ -262,6 +302,36 @@ def generate_mock_recommendation(request: TacticalRequest) -> TacticalRecommenda
             ],
             "roe_compliance": "GREEN - Relay positioning within operational boundaries.",
             "confidence": "HIGH"
+        },
+        "SPOOFING": {
+            "primary_action": f"CRITICAL: {drone_id} GPS data compromised. Engage inertial navigation system and cross-reference with swarm consensus.",
+            "recovery_steps": [
+                f"1. Immediately disable GPS input on {drone_id}",
+                "2. Switch to INS (Inertial Navigation System) with dead reckoning",
+                "3. Cross-validate position with D-2 and D-4 radar returns",
+                "4. Mark current coordinates as UNTRUSTED until verification complete"
+            ],
+            "reassignment_vectors": [
+                {"drone_id": "D-2", "action": "VERIFY_POSITION", "note": f"Triangulate {drone_id} actual position"},
+                {"drone_id": "D-4", "action": "RADAR_TRACK", "note": f"Track {drone_id} via radar"}
+            ],
+            "roe_compliance": "AMBER - Spoofing may have caused position drift. Verify before resuming mission.",
+            "confidence": "MEDIUM"
+        },
+        "CYBER_INTRUSION": {
+            "primary_action": f"ALERT: Cyber intrusion detected on {drone_id}. Isolate from swarm network immediately.",
+            "recovery_steps": [
+                f"1. Disconnect {drone_id} from swarm mesh network",
+                "2. Enable autonomous safe-mode on affected asset",
+                "3. Initiate system integrity check on remaining swarm",
+                "4. Prepare manual override capability for compromised unit"
+            ],
+            "reassignment_vectors": [
+                {"drone_id": "D-5", "action": "NETWORK_GUARD", "note": "Monitor for lateral movement"},
+                {"drone_id": "D-4", "action": "RELAY_BYPASS", "note": f"Exclude {drone_id} from relay chain"}
+            ],
+            "roe_compliance": "RED - Asset potentially compromised. Do NOT execute offensive commands via affected unit.",
+            "confidence": "MEDIUM"
         }
     }
     
@@ -327,7 +397,7 @@ async def reset_swarm():
 
 @api_router.post("/swarm/simulate-ew-attack")
 async def simulate_ew_attack():
-    """Simulate Electronic Warfare attack on Drone-1"""
+    """Simulate Electronic Warfare attack on Drone-1 (legacy endpoint)"""
     global current_swarm_state
     
     # Find and update D-1
@@ -361,6 +431,56 @@ async def simulate_ew_attack():
         "status": "attack_simulated",
         "affected_drone": "D-1",
         "anomaly_type": "GPS_JAMMING",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+@api_router.post("/swarm/simulate-attack")
+async def simulate_attack(request: AttackSimulationRequest):
+    """Simulate attack with user-selected type and target drone"""
+    global current_swarm_state
+    
+    attack_type = request.attack_type
+    target_drone = request.target_drone
+    
+    # Get attack configuration
+    config = ATTACK_CONFIGS.get(attack_type, ATTACK_CONFIGS["GPS_JAMMING"])
+    
+    # Find target drone and get callsign
+    callsign = target_drone
+    for drone in current_swarm_state["drones"]:
+        if drone["id"] == target_drone:
+            callsign = drone.get("callsign", target_drone)
+            # Apply attack effects
+            drone["gps_status"] = config["gps_status"]
+            drone["signal_strength"] = config["signal_strength"]
+            drone["status"] = config["status"]
+            drone["last_update"] = datetime.now(timezone.utc).isoformat()
+            break
+    
+    current_swarm_state["ew_attack_active"] = True
+    
+    # Log anomaly event
+    anomaly = AnomalyEvent(
+        drone_id=target_drone,
+        anomaly_type=attack_type,
+        severity=config["status"]
+    )
+    await db.anomaly_events.insert_one(anomaly.model_dump())
+    
+    # Log mission event
+    description = config["description_template"].format(drone_id=target_drone, callsign=callsign)
+    event = MissionEvent(
+        event_type=config["event_type"],
+        description=description,
+        data={"affected_drone": target_drone, "anomaly_type": attack_type}
+    )
+    await db.mission_events.insert_one(event.model_dump())
+    
+    return {
+        "status": "attack_simulated",
+        "affected_drone": target_drone,
+        "anomaly_type": attack_type,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 

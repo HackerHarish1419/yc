@@ -1,42 +1,74 @@
-import { AlertTriangle, Radio, ShieldAlert, Zap } from 'lucide-react';
+import { AlertTriangle, Radio, ShieldAlert, Zap, Wifi, Lock } from 'lucide-react';
 
 function AlertPanel({ drones, ewAttackActive }) {
   const criticalDrones = drones.filter(d => d.status === 'CRITICAL');
   const warningDrones = drones.filter(d => d.status === 'WARNING');
   const gpsLostDrones = drones.filter(d => d.gps_status === 'LOST');
+  const gpsDegradedDrones = drones.filter(d => d.gps_status === 'DEGRADED');
   const lowBatteryDrones = drones.filter(d => d.battery < 30);
   const lowSignalDrones = drones.filter(d => d.signal_strength < -70);
 
   const alerts = [];
+  const addedAlertIds = new Set(); // Track added alerts to prevent duplicates
 
-  // EW Attack Alert
-  if (ewAttackActive) {
-    alerts.push({
-      id: 'ew-attack',
-      severity: 'CRITICAL',
-      icon: Zap,
-      title: 'ELECTRONIC WARFARE DETECTED',
-      description: 'GPS jamming affecting swarm assets',
-      time: 'NOW'
-    });
-  }
+  // Helper to add alert without duplicates
+  const addAlert = (alert) => {
+    if (!addedAlertIds.has(alert.id)) {
+      addedAlertIds.add(alert.id);
+      alerts.push(alert);
+    }
+  };
 
-  // GPS Lost Alerts
-  gpsLostDrones.forEach(drone => {
-    alerts.push({
-      id: `gps-${drone.id}`,
-      severity: 'CRITICAL',
-      icon: ShieldAlert,
-      title: `GPS LOST - ${drone.callsign}`,
-      description: `Asset ${drone.id} has lost GPS lock`,
-      time: 'ACTIVE'
-    });
+  // Critical drone alerts (covers all attack types)
+  criticalDrones.forEach(drone => {
+    if (drone.gps_status === 'LOST') {
+      addAlert({
+        id: `gps-lost-${drone.id}`,
+        severity: 'CRITICAL',
+        icon: ShieldAlert,
+        title: `GPS LOST - ${drone.callsign}`,
+        description: `Asset ${drone.id} has lost GPS lock`,
+        time: 'ACTIVE'
+      });
+    } else if (drone.signal_strength < -90) {
+      addAlert({
+        id: `signal-critical-${drone.id}`,
+        severity: 'CRITICAL',
+        icon: Wifi,
+        title: `SIGNAL LOSS - ${drone.callsign}`,
+        description: `Communication link degraded. RSSI: ${drone.signal_strength}dBm`,
+        time: 'ACTIVE'
+      });
+    } else {
+      addAlert({
+        id: `critical-${drone.id}`,
+        severity: 'CRITICAL',
+        icon: Lock,
+        title: `THREAT DETECTED - ${drone.callsign}`,
+        description: `Asset ${drone.id} status critical. Investigation required.`,
+        time: 'ACTIVE'
+      });
+    }
   });
 
-  // Low Signal Alerts
+  // Warning drone alerts (spoofing, etc.)
+  warningDrones.forEach(drone => {
+    if (drone.gps_status === 'DEGRADED') {
+      addAlert({
+        id: `gps-degraded-${drone.id}`,
+        severity: 'WARNING',
+        icon: AlertTriangle,
+        title: `GPS DEGRADED - ${drone.callsign}`,
+        description: `Position data may be unreliable`,
+        time: 'ACTIVE'
+      });
+    }
+  });
+
+  // Low Signal Alerts (only if not already critical)
   lowSignalDrones.forEach(drone => {
-    if (drone.status !== 'CRITICAL') {
-      alerts.push({
+    if (drone.status !== 'CRITICAL' && drone.signal_strength >= -90) {
+      addAlert({
         id: `signal-${drone.id}`,
         severity: 'WARNING',
         icon: Radio,
@@ -49,7 +81,7 @@ function AlertPanel({ drones, ewAttackActive }) {
 
   // Low Battery Alerts
   lowBatteryDrones.forEach(drone => {
-    alerts.push({
+    addAlert({
       id: `battery-${drone.id}`,
       severity: drone.battery < 15 ? 'CRITICAL' : 'WARNING',
       icon: AlertTriangle,
