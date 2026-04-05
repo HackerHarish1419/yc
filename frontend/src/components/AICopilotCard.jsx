@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Cpu, CheckCircle, ArrowRight, Shield } from 'lucide-react';
+import { Cpu, CheckCircle, ArrowRight, Shield, Play, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Progress } from '../components/ui/progress';
 
-function AICopilotCard({ recommendation, isLoading, onApprove }) {
+function AICopilotCard({ recommendation, isLoading, onApprove, recoveryStatus, onAdvanceRecovery }) {
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showFullContent, setShowFullContent] = useState(false);
+
+  const activeRecovery = recoveryStatus?.active_recovery;
+  const isRecoveryActive = !!activeRecovery;
 
   // Typewriter effect for primary action
   useEffect(() => {
@@ -151,16 +155,48 @@ function AICopilotCard({ recommendation, isLoading, onApprove }) {
               </span>
             </div>
             
-            {/* Approve Button */}
-            <Button
-              onClick={() => onApprove(recommendation.recommendation_id)}
-              className="w-full bg-[#007AFF] text-white font-bold uppercase tracking-widest py-3 rounded-none
-                hover:bg-white hover:text-[#0A0A0A] transition-colors"
-              data-testid="approve-copilot-route"
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              APPROVE & EXECUTE
-            </Button>
+            {/* Recovery Progress or Approve Button */}
+            {isRecoveryActive ? (
+              <div className="space-y-3">
+                <div className="p-3 bg-[#007AFF]/10 border border-[#007AFF]/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-mono text-[#007AFF] uppercase tracking-wider">
+                      RECOVERY IN PROGRESS
+                    </span>
+                    <span className="text-xs font-mono text-white">
+                      Step {activeRecovery.current_step}/{activeRecovery.total_steps}
+                    </span>
+                  </div>
+                  <Progress 
+                    value={(activeRecovery.current_step / activeRecovery.total_steps) * 100}
+                    className="h-2 bg-[#2A2D35] rounded-none"
+                    indicatorClassName="bg-[#007AFF] rounded-none"
+                  />
+                  <p className="text-[10px] font-mono text-[#8F939D] mt-2">
+                    {recommendation.recovery_steps[activeRecovery.current_step - 1] || "Executing..."}
+                  </p>
+                </div>
+                <Button
+                  onClick={onAdvanceRecovery}
+                  className="w-full bg-[#00FF66] text-[#0A0A0A] font-bold uppercase tracking-widest py-3 rounded-none
+                    hover:bg-white transition-colors"
+                  data-testid="advance-recovery-btn"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  COMPLETE STEP {activeRecovery.current_step}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={() => onApprove(recommendation.recommendation_id)}
+                className="w-full bg-[#007AFF] text-white font-bold uppercase tracking-widest py-3 rounded-none
+                  hover:bg-white hover:text-[#0A0A0A] transition-colors"
+                data-testid="approve-copilot-route"
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                APPROVE & EXECUTE
+              </Button>
+            )}
           </>
         )}
       </div>

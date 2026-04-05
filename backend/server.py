@@ -143,90 +143,150 @@ ATTACK_CONFIGS = {
 
 
 # ===== Initial Swarm Data =====
-INITIAL_SWARM = [
-    {
-        "id": "D-1",
-        "callsign": "ALPHA-1",
-        "lat": 34.0522,
-        "lng": -118.2437,
-        "altitude": 1200,
-        "battery": 87,
-        "signal_strength": -42,
-        "gps_status": "NOMINAL",
-        "status": "ACTIVE",
-        "heading": 45,
-        "speed": 35.2,
-        "mission_role": "LEAD",
-        "last_update": datetime.now(timezone.utc).isoformat()
-    },
-    {
-        "id": "D-2",
-        "callsign": "BRAVO-2",
-        "lat": 34.0532,
-        "lng": -118.2457,
-        "altitude": 1150,
-        "battery": 92,
-        "signal_strength": -38,
-        "gps_status": "NOMINAL",
-        "status": "ACTIVE",
-        "heading": 42,
-        "speed": 34.8,
-        "mission_role": "RECON",
-        "last_update": datetime.now(timezone.utc).isoformat()
-    },
-    {
-        "id": "D-3",
-        "callsign": "CHARLIE-3",
-        "lat": 34.0512,
-        "lng": -118.2417,
-        "altitude": 1180,
-        "battery": 78,
-        "signal_strength": -45,
-        "gps_status": "NOMINAL",
-        "status": "ACTIVE",
-        "heading": 48,
-        "speed": 36.1,
-        "mission_role": "SUPPORT",
-        "last_update": datetime.now(timezone.utc).isoformat()
-    },
-    {
-        "id": "D-4",
-        "callsign": "DELTA-4",
-        "lat": 34.0542,
-        "lng": -118.2427,
-        "altitude": 1220,
-        "battery": 95,
-        "signal_strength": -35,
-        "gps_status": "NOMINAL",
-        "status": "ACTIVE",
-        "heading": 44,
-        "speed": 35.5,
-        "mission_role": "RELAY",
-        "last_update": datetime.now(timezone.utc).isoformat()
-    },
-    {
-        "id": "D-5",
-        "callsign": "ECHO-5",
-        "lat": 34.0502,
-        "lng": -118.2447,
-        "altitude": 1100,
-        "battery": 68,
-        "signal_strength": -48,
-        "gps_status": "NOMINAL",
-        "status": "ACTIVE",
-        "heading": 50,
-        "speed": 33.9,
-        "mission_role": "RESERVE",
-        "last_update": datetime.now(timezone.utc).isoformat()
-    }
-]
+# Formation patterns with relative offsets from center
+FORMATIONS = {
+    "SPREAD": [  # Independent spread pattern
+        {"lat_offset": 0.002, "lng_offset": 0},
+        {"lat_offset": 0.001, "lng_offset": -0.002},
+        {"lat_offset": -0.001, "lng_offset": 0.002},
+        {"lat_offset": 0.001, "lng_offset": 0.002},
+        {"lat_offset": -0.002, "lng_offset": -0.001},
+    ],
+    "V_FORMATION": [  # V-shape flight pattern
+        {"lat_offset": 0.003, "lng_offset": 0},  # Lead
+        {"lat_offset": 0.0015, "lng_offset": -0.0015},
+        {"lat_offset": 0.0015, "lng_offset": 0.0015},
+        {"lat_offset": 0, "lng_offset": -0.003},
+        {"lat_offset": 0, "lng_offset": 0.003},
+    ],
+    "LINE": [  # Single file line
+        {"lat_offset": 0.004, "lng_offset": 0},
+        {"lat_offset": 0.002, "lng_offset": 0},
+        {"lat_offset": 0, "lng_offset": 0},
+        {"lat_offset": -0.002, "lng_offset": 0},
+        {"lat_offset": -0.004, "lng_offset": 0},
+    ],
+    "DIAMOND": [  # Diamond formation
+        {"lat_offset": 0.003, "lng_offset": 0},  # Front
+        {"lat_offset": 0, "lng_offset": -0.002},  # Left
+        {"lat_offset": 0, "lng_offset": 0.002},  # Right
+        {"lat_offset": 0, "lng_offset": 0},  # Center
+        {"lat_offset": -0.003, "lng_offset": 0},  # Rear
+    ],
+    "CIRCLE": [  # Circular patrol pattern
+        {"lat_offset": 0.002, "lng_offset": 0},
+        {"lat_offset": 0.0006, "lng_offset": 0.0019},
+        {"lat_offset": -0.0016, "lng_offset": 0.0012},
+        {"lat_offset": -0.0016, "lng_offset": -0.0012},
+        {"lat_offset": 0.0006, "lng_offset": -0.0019},
+    ],
+}
+
+# Base center position for formation
+BASE_CENTER = {"lat": 34.0522, "lng": -118.2437}
+
+def create_initial_swarm(formation="SPREAD"):
+    """Create initial swarm with specified formation"""
+    offsets = FORMATIONS.get(formation, FORMATIONS["SPREAD"])
+    return [
+        {
+            "id": "D-1",
+            "callsign": "ALPHA-1",
+            "lat": BASE_CENTER["lat"] + offsets[0]["lat_offset"],
+            "lng": BASE_CENTER["lng"] + offsets[0]["lng_offset"],
+            "altitude": 1200,
+            "battery": 87,
+            "signal_strength": -42,
+            "gps_status": "NOMINAL",
+            "status": "ACTIVE",
+            "heading": 45,
+            "speed": 35.2,
+            "mission_role": "LEAD",
+            "recovery_status": None,
+            "recovery_progress": 0,
+            "last_update": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": "D-2",
+            "callsign": "BRAVO-2",
+            "lat": BASE_CENTER["lat"] + offsets[1]["lat_offset"],
+            "lng": BASE_CENTER["lng"] + offsets[1]["lng_offset"],
+            "altitude": 1150,
+            "battery": 92,
+            "signal_strength": -38,
+            "gps_status": "NOMINAL",
+            "status": "ACTIVE",
+            "heading": 42,
+            "speed": 34.8,
+            "mission_role": "RECON",
+            "recovery_status": None,
+            "recovery_progress": 0,
+            "last_update": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": "D-3",
+            "callsign": "CHARLIE-3",
+            "lat": BASE_CENTER["lat"] + offsets[2]["lat_offset"],
+            "lng": BASE_CENTER["lng"] + offsets[2]["lng_offset"],
+            "altitude": 1180,
+            "battery": 78,
+            "signal_strength": -45,
+            "gps_status": "NOMINAL",
+            "status": "ACTIVE",
+            "heading": 48,
+            "speed": 36.1,
+            "mission_role": "SUPPORT",
+            "recovery_status": None,
+            "recovery_progress": 0,
+            "last_update": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": "D-4",
+            "callsign": "DELTA-4",
+            "lat": BASE_CENTER["lat"] + offsets[3]["lat_offset"],
+            "lng": BASE_CENTER["lng"] + offsets[3]["lng_offset"],
+            "altitude": 1220,
+            "battery": 95,
+            "signal_strength": -35,
+            "gps_status": "NOMINAL",
+            "status": "ACTIVE",
+            "heading": 44,
+            "speed": 35.5,
+            "mission_role": "RELAY",
+            "recovery_status": None,
+            "recovery_progress": 0,
+            "last_update": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": "D-5",
+            "callsign": "ECHO-5",
+            "lat": BASE_CENTER["lat"] + offsets[4]["lat_offset"],
+            "lng": BASE_CENTER["lng"] + offsets[4]["lng_offset"],
+            "altitude": 1100,
+            "battery": 68,
+            "signal_strength": -48,
+            "gps_status": "NOMINAL",
+            "status": "ACTIVE",
+            "heading": 50,
+            "speed": 33.9,
+            "mission_role": "RESERVE",
+            "recovery_status": None,
+            "recovery_progress": 0,
+            "last_update": datetime.now(timezone.utc).isoformat()
+        }
+    ]
+
+# Initialize with default formation
+INITIAL_SWARM = create_initial_swarm("SPREAD")
 
 # In-memory swarm state
 current_swarm_state = {
-    "drones": INITIAL_SWARM.copy(),
+    "drones": [d.copy() for d in INITIAL_SWARM],
     "mission_id": "MSN-2026-ALPHA",
     "mission_status": "ACTIVE",
-    "ew_attack_active": False
+    "ew_attack_active": False,
+    "formation": "SPREAD",
+    "active_recovery": None  # Track active recovery operation
 }
 
 
@@ -406,26 +466,191 @@ async def get_swarm_state():
 
 
 @api_router.post("/swarm/reset")
-async def reset_swarm():
-    """Reset swarm to initial state"""
+async def reset_swarm(formation: str = "SPREAD"):
+    """Reset swarm to initial state with optional formation"""
     global current_swarm_state
+    
+    # Validate formation
+    if formation not in FORMATIONS:
+        formation = "SPREAD"
+    
+    # Create fresh swarm with specified formation
+    new_swarm = create_initial_swarm(formation)
+    
     current_swarm_state = {
-        "drones": [d.copy() for d in INITIAL_SWARM],
+        "drones": new_swarm,
         "mission_id": "MSN-2026-ALPHA",
         "mission_status": "ACTIVE",
-        "ew_attack_active": False
+        "ew_attack_active": False,
+        "formation": formation,
+        "active_recovery": None
     }
-    for drone in current_swarm_state["drones"]:
-        drone["last_update"] = datetime.now(timezone.utc).isoformat()
     
     # Log event
     event = MissionEvent(
         event_type="SWARM_RESET",
-        description="Swarm state reset to initial configuration"
+        description=f"Swarm state reset to initial configuration. Formation: {formation}"
     )
     await db.mission_events.insert_one(event.model_dump())
     
     return {"status": "reset", "swarm_state": current_swarm_state}
+
+
+@api_router.post("/swarm/set-formation")
+async def set_formation(formation: str):
+    """Change swarm formation pattern"""
+    global current_swarm_state
+    
+    if formation not in FORMATIONS:
+        raise HTTPException(status_code=400, detail=f"Invalid formation. Available: {list(FORMATIONS.keys())}")
+    
+    offsets = FORMATIONS[formation]
+    
+    # Update drone positions based on new formation
+    for i, drone in enumerate(current_swarm_state["drones"]):
+        if i < len(offsets):
+            drone["lat"] = BASE_CENTER["lat"] + offsets[i]["lat_offset"]
+            drone["lng"] = BASE_CENTER["lng"] + offsets[i]["lng_offset"]
+            drone["last_update"] = datetime.now(timezone.utc).isoformat()
+    
+    current_swarm_state["formation"] = formation
+    
+    # Log event
+    event = MissionEvent(
+        event_type="FORMATION_CHANGE",
+        description=f"Swarm formation changed to {formation}",
+        data={"formation": formation}
+    )
+    await db.mission_events.insert_one(event.model_dump())
+    
+    return {"status": "formation_changed", "formation": formation, "swarm_state": current_swarm_state}
+
+
+@api_router.get("/swarm/formations")
+async def get_formations():
+    """Get available formation patterns"""
+    return {
+        "formations": list(FORMATIONS.keys()),
+        "current": current_swarm_state.get("formation", "SPREAD"),
+        "descriptions": {
+            "SPREAD": "Independent spread pattern - drones dispersed for maximum coverage",
+            "V_FORMATION": "V-shape flight pattern - classic military formation",
+            "LINE": "Single file line - follow the leader pattern",
+            "DIAMOND": "Diamond formation - balanced defense pattern",
+            "CIRCLE": "Circular patrol pattern - 360° coverage"
+        }
+    }
+
+
+@api_router.post("/swarm/start-recovery/{drone_id}")
+async def start_recovery(drone_id: str, recommendation_id: str):
+    """Start recovery process for a drone"""
+    global current_swarm_state
+    
+    # Find the drone
+    drone = None
+    for d in current_swarm_state["drones"]:
+        if d["id"] == drone_id:
+            drone = d
+            break
+    
+    if not drone:
+        raise HTTPException(status_code=404, detail="Drone not found")
+    
+    # Initialize recovery
+    drone["recovery_status"] = "IN_PROGRESS"
+    drone["recovery_progress"] = 0
+    drone["status"] = "WARNING"  # Change from CRITICAL to WARNING
+    drone["last_update"] = datetime.now(timezone.utc).isoformat()
+    
+    current_swarm_state["active_recovery"] = {
+        "drone_id": drone_id,
+        "recommendation_id": recommendation_id,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "current_step": 1,
+        "total_steps": 4
+    }
+    
+    # Log event
+    event = MissionEvent(
+        event_type="RECOVERY_STARTED",
+        description=f"Recovery protocol initiated for {drone_id}",
+        data={"drone_id": drone_id, "recommendation_id": recommendation_id}
+    )
+    await db.mission_events.insert_one(event.model_dump())
+    
+    return {"status": "recovery_started", "drone_id": drone_id, "recovery": current_swarm_state["active_recovery"]}
+
+
+@api_router.post("/swarm/advance-recovery")
+async def advance_recovery():
+    """Advance recovery to next step"""
+    global current_swarm_state
+    
+    recovery = current_swarm_state.get("active_recovery")
+    if not recovery:
+        raise HTTPException(status_code=400, detail="No active recovery in progress")
+    
+    drone_id = recovery["drone_id"]
+    
+    # Find drone
+    drone = None
+    for d in current_swarm_state["drones"]:
+        if d["id"] == drone_id:
+            drone = d
+            break
+    
+    if not drone:
+        raise HTTPException(status_code=404, detail="Drone not found")
+    
+    # Advance step
+    recovery["current_step"] += 1
+    progress = int((recovery["current_step"] / recovery["total_steps"]) * 100)
+    drone["recovery_progress"] = progress
+    drone["last_update"] = datetime.now(timezone.utc).isoformat()
+    
+    # Check if recovery complete
+    if recovery["current_step"] >= recovery["total_steps"]:
+        drone["recovery_status"] = "COMPLETED"
+        drone["recovery_progress"] = 100
+        drone["status"] = "ACTIVE"
+        drone["gps_status"] = "NOMINAL"
+        drone["signal_strength"] = -42
+        current_swarm_state["active_recovery"] = None
+        current_swarm_state["ew_attack_active"] = False
+        
+        # Log completion
+        event = MissionEvent(
+            event_type="RECOVERY_COMPLETED",
+            description=f"Recovery protocol completed for {drone_id}. Asset restored to NOMINAL.",
+            data={"drone_id": drone_id}
+        )
+        await db.mission_events.insert_one(event.model_dump())
+        
+        return {"status": "recovery_completed", "drone_id": drone_id, "drone": drone}
+    
+    # Log step progress
+    event = MissionEvent(
+        event_type="RECOVERY_PROGRESS",
+        description=f"Recovery step {recovery['current_step']}/{recovery['total_steps']} completed for {drone_id}",
+        data={"drone_id": drone_id, "step": recovery["current_step"], "progress": progress}
+    )
+    await db.mission_events.insert_one(event.model_dump())
+    
+    return {"status": "step_completed", "step": recovery["current_step"], "progress": progress, "recovery": recovery}
+
+
+@api_router.get("/swarm/recovery-status")
+async def get_recovery_status():
+    """Get current recovery status"""
+    return {
+        "active_recovery": current_swarm_state.get("active_recovery"),
+        "drones_in_recovery": [
+            {"id": d["id"], "status": d.get("recovery_status"), "progress": d.get("recovery_progress", 0)}
+            for d in current_swarm_state["drones"]
+            if d.get("recovery_status") == "IN_PROGRESS"
+        ]
+    }
 
 
 @api_router.post("/swarm/simulate-ew-attack")

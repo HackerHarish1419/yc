@@ -11,6 +11,7 @@ import AICopilotCard from "./components/AICopilotCard";
 import MissionTimeline from "./components/MissionTimeline";
 import AlertPanel from "./components/AlertPanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
+import { Progress } from "./components/ui/progress";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -23,6 +24,15 @@ const ATTACK_TYPES = [
   { id: "CYBER_INTRUSION", label: "Cyber Intrusion", description: "Attempted system breach detected" },
 ];
 
+// Formation descriptions
+const FORMATIONS = {
+  "SPREAD": "Independent spread - maximum coverage",
+  "V_FORMATION": "V-shape - classic military pattern",
+  "LINE": "Single file - follow the leader",
+  "DIAMOND": "Diamond - balanced defense",
+  "CIRCLE": "Circular - 360° patrol coverage"
+};
+
 function App() {
   const [swarmState, setSwarmState] = useState(null);
   const [selectedDrone, setSelectedDrone] = useState(null);
@@ -33,6 +43,8 @@ function App() {
   const [systemHealth, setSystemHealth] = useState(null);
   const [selectedAttackType, setSelectedAttackType] = useState("GPS_JAMMING");
   const [selectedTargetDrone, setSelectedTargetDrone] = useState("D-1");
+  const [selectedFormation, setSelectedFormation] = useState("SPREAD");
+  const [recoveryStatus, setRecoveryStatus] = useState(null);
   const lastAttackId = useRef(null); // Track last attack to prevent duplicates
 
   // Fetch swarm state
@@ -41,6 +53,7 @@ function App() {
       const response = await axios.get(`${API}/swarm/state`);
       setSwarmState(response.data);
       setEwAttackActive(response.data.ew_attack_active);
+      setSelectedFormation(response.data.formation || "SPREAD");
     } catch (e) {
       console.error("Failed to fetch swarm state:", e);
     }
@@ -53,6 +66,16 @@ function App() {
       setMissionEvents(response.data);
     } catch (e) {
       console.error("Failed to fetch mission events:", e);
+    }
+  }, []);
+
+  // Fetch recovery status
+  const fetchRecoveryStatus = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/swarm/recovery-status`);
+      setRecoveryStatus(response.data);
+    } catch (e) {
+      console.error("Failed to fetch recovery status:", e);
     }
   }, []);
 
@@ -115,9 +138,10 @@ function App() {
   // Reset swarm
   const resetSwarm = async () => {
     try {
-      await axios.post(`${API}/swarm/reset`);
+      await axios.post(`${API}/swarm/reset?formation=${selectedFormation}`);
       setRecommendation(null);
       setEwAttackActive(false);
+      setRecoveryStatus(null);
       lastAttackId.current = null; // Clear attack tracking
       await fetchSwarmState();
       await fetchMissionEvents();
@@ -128,13 +152,61 @@ function App() {
     }
   };
 
-  // Approve recommendation
+  // Change formation
+  const changeFormation = async (formation) => {
+    try {
+      await axios.post(`${API}/swarm/set-formation?formation=${formation}`);
+      setSelectedFormation(formation);
+      await fetchSwarmState();
+      await fetchMissionEvents();
+      toast.success(`Formation changed to ${formation}`);
+    } catch (e) {
+      console.error("Failed to change formation:", e);
+      toast.error("Failed to change formation");
+    }
+  };
+
+  // Start recovery
+  const startRecovery = async (droneId, recommendationId) => {
+    try {
+      await axios.post(`${API}/swarm/start-recovery/${droneId}?recommendation_id=${recommendationId}`);
+      toast.success(`Recovery started for ${droneId}`);
+      await fetchSwarmState();
+      await fetchMissionEvents();
+      await fetchRecoveryStatus();
+    } catch (e) {
+      console.error("Failed to start recovery:", e);
+      toast.error("Failed to start recovery");
+    }
+  };
+
+  // Advance recovery step
+  const advanceRecovery = async () => {
+    try {
+      const response = await axios.post(`${API}/swarm/advance-recovery`);
+      if (response.data.status === "recovery_completed") {
+        toast.success(`Recovery completed! Asset restored to NOMINAL`);
+        setRecommendation(null);
+        setRecoveryStatus(null);
+      } else {
+        toast.success(`Step ${response.data.step} completed (${response.data.progress}%)`);
+      }
+      await fetchSwarmState();
+      await fetchMissionEvents();
+      await fetchRecoveryStatus();
+    } catch (e) {
+      console.error("Failed to advance recovery:", e);
+      toast.error("Failed to advance recovery step");
+    }
+  };
+
+  // Approve recommendation and start recovery
   const approveRecommendation = async (recommendationId) => {
     try {
       await axios.post(`${API}/copilot/approve/${recommendationId}`);
-      toast.success("Recovery protocol initiated");
-      await fetchSwarmState();
-      await fetchMissionEvents();
+      // Find the affected drone from recommendation context
+      const affectedDrone = selectedTargetDrone;
+      await startRecovery(affectedDrone, recommendationId);
     } catch (e) {
       console.error("Failed to approve recommendation:", e);
       toast.error("Failed to approve recommendation");
@@ -146,14 +218,16 @@ function App() {
     fetchSwarmState();
     fetchMissionEvents();
     fetchSystemHealth();
+    fetchRecoveryStatus();
 
     // Poll every 3 seconds
     const interval = setInterval(() => {
       fetchSwarmState();
+      fetchRecoveryStatus();
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [fetchSwarmState, fetchMissionEvents, fetchSystemHealth]);
+  }, [fetchSwarmState, fetchMissionEvents, fetchSystemHealth, fetchRecoveryStatus]);
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-4" data-testid="aura-v-dashboard">
@@ -220,6 +294,35 @@ function App() {
             swarmState={swarmState} 
             systemHealth={systemHealth}
           />
+
+          {/* Formation Control Panel */}
+          <div className="border border-[#2A2D35] bg-[#0A0A0A] p-4">
+            <div className="text-xs font-mono text-[#8F939D] tracking-[0.2em] uppercase mb-3">
+              FORMATION CONTROL
+            </div>
+            <div>
+              <label className="text-[10px] font-mono text-[#5C5F66] uppercase mb-1 block">Swarm Pattern</label>
+              <Select value={selectedFormation} onValueChange={changeFormation}>
+                <SelectTrigger className="bg-[#050505] border-[#2A2D35] text-white text-xs font-mono rounded-none h-9" data-testid="formation-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0A0A0A] border-[#2A2D35] rounded-none">
+                  {Object.entries(FORMATIONS).map(([key, desc]) => (
+                    <SelectItem 
+                      key={key} 
+                      value={key}
+                      className="text-xs font-mono text-white hover:bg-[#2A2D35] rounded-none"
+                    >
+                      {key.replace('_', ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] font-mono text-[#5C5F66] mt-2">
+                {FORMATIONS[selectedFormation]}
+              </p>
+            </div>
+          </div>
 
           {/* Attack Simulation Panel */}
           <div className="border border-[#2A2D35] bg-[#0A0A0A] p-4">
@@ -305,6 +408,8 @@ function App() {
               recommendation={recommendation}
               isLoading={isLoadingRecommendation}
               onApprove={approveRecommendation}
+              recoveryStatus={recoveryStatus}
+              onAdvanceRecovery={advanceRecovery}
             />
           )}
 
